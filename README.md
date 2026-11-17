@@ -14,7 +14,9 @@ Deine persönliche Web-App für das **Abitur 2027 in NRW**: Noten, Abi-Schnitt, 
 
 **https://noblefreddy.github.io/ABI/** – funktioniert auch auf dem Handy (im Browser „Zum Startbildschirm hinzufügen“).
 
-Bei jedem Hochladen auf `main` baut GitHub die Seite automatisch neu und veröffentlicht sie (`.github/workflows/deploy.yml`). Einmalig muss dafür unter **Settings → Pages → Source** „**GitHub Actions**“ ausgewählt sein.
+Bei jedem Hochladen auf `main` baut GitHub die Seite automatisch (inkl. Tests) und legt das fertige Ergebnis in den Branch **`gh-pages`** (`.github/workflows/deploy.yml`). GitHub Pages veröffentlicht diesen Branch. Einstellung dafür: **Settings → Pages → Source: „Deploy from a branch“ → Branch `gh-pages`, Ordner `/ (root)`**.
+
+> Nicht `main` als Quelle wählen – dort liegt nur der Quellcode, das ergibt eine weiße Seite.
 
 > Die Daten liegen immer im Browser des jeweiligen Geräts. Online-Version, lokale Version und Handy haben also **getrennte** Daten. Zum Übertragen: unter „Einstellungen & Backup“ ein Backup herunterladen und auf dem anderen Gerät wiederherstellen.
 
