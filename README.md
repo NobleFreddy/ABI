@@ -10,7 +10,15 @@ Deine persönliche Web-App für das **Abitur 2027 in NRW**: Noten, Abi-Schnitt, 
 
 ---
 
-## Starten
+## Online nutzen
+
+**https://noblefreddy.github.io/ABI/** – funktioniert auch auf dem Handy (im Browser „Zum Startbildschirm hinzufügen“).
+
+Bei jedem Hochladen auf `main` baut GitHub die Seite automatisch neu und veröffentlicht sie (`.github/workflows/deploy.yml`). Einmalig muss dafür unter **Settings → Pages → Source** „**GitHub Actions**“ ausgewählt sein.
+
+> Die Daten liegen immer im Browser des jeweiligen Geräts. Online-Version, lokale Version und Handy haben also **getrennte** Daten. Zum Übertragen: unter „Einstellungen & Backup“ ein Backup herunterladen und auf dem anderen Gerät wiederherstellen.
+
+## Lokal starten
 
 **Doppelklick auf `ABI-starten.bat`**
 - Beim ersten Start werden die nötigen Pakete installiert. Das dauert einmalig etwa eine Minute.
