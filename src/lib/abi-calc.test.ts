@@ -151,6 +151,47 @@ describe('Block I – Beispiele aus dem Merkblatt des Schulministeriums NRW', ()
     expect(r.admitted).toBe(true)
   })
 
+  it('begründet für jeden Kurs, warum er zählt oder nicht', () => {
+    const courses = [
+      ...subject('D', [5, 5, 6, 6], { mandatory: true }),
+      ...subject('E', [7, 9, 7, 8], { lk: true }),
+      ...subject('L8', [5, 8, null, null]),
+      ...subject('KU', [11, 12, 11, 12], { lk: true }),
+      ...subject('EK', [10, 10, 10, 10], { mandatory: true }),
+      ...subject('GE', [null, null, 5, 5], { mandatory: true }),
+      ...subject('SW', [null, null, 6, 6], { mandatory: true }),
+      ...subject('M', [5, 6, 5, 7], { mandatory: true }),
+      ...subject('BI', [9, 9, 8, 9], { mandatory: true }),
+      ...subject('CH', [8, 8, 9, 7], { mandatory: [false, false, true, true] }),
+      ...subject('ER', [10, 10, null, null], { mandatory: true }),
+      ...subject('SP', [9, 9, 8, 8]),
+      ...subject('IF', [0, null, null, null]),
+    ]
+    const r = computeBlockI(courses, { complete: true, exclude: new Set(['CH|Q1.1']) })
+    expect(r.reasons['E|Q1.1'].kind).toBe('lk')
+    expect(r.reasons['D|Q1.1'].kind).toBe('pflicht')
+    expect(r.reasons['SP|Q1.1']).toMatchObject({ included: true, kind: 'raises' })
+    expect(r.reasons['L8|Q1.1']).toMatchObject({ included: false, kind: 'below' })
+    expect(r.reasons['IF|Q1.1']).toMatchObject({ included: false, kind: 'zero' })
+    expect(r.reasons['CH|Q1.1']).toMatchObject({ included: false, kind: 'excluded' })
+    // jeder Kurs hat eine Begründung, und sie passt zur Auswahl
+    const selected = new Set(r.selected.map((c) => c.id))
+    for (const c of courses) expect(r.reasons[c.id].included, c.id).toBe(selected.has(c.id))
+  })
+
+  it('erklärt, wenn ein schwacher Kurs nur zum Auffüllen auf 35 Kurse zählt', () => {
+    const courses = [
+      ...subject('LK1', [12, 12, 12, 12], { lk: true }),
+      ...subject('LK2', [12, 12, 12, 12], { lk: true }),
+      ...Array.from({ length: 6 }, (_, i) => subject(`P${i}`, [12, 12, 12, 12], { mandatory: true })).flat(),
+      ...subject('W', [6, 7, null, null]),
+      ...subject('Z', [5, null, null, null]),
+    ] // 8 LK + 24 Pflicht-GK = 32 → die 3 schwachen Kurse werden für die Mindestzahl 35 gebraucht
+    const r = computeBlockI(courses, { complete: false })
+    expect(r.count).toBe(35)
+    expect(r.reasons['Z|Q1.1']).toMatchObject({ included: true, kind: 'filler' })
+  })
+
   it('8 Defizite bei nur 37 Kursen sind nicht erlaubt', () => {
     const courses = [
       ...subject('D', [5, 7, 6, 7], { lk: true }),

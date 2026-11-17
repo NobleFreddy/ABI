@@ -122,13 +122,15 @@ function BlockICard() {
                           disabled={mand}
                           onClick={() => toggle(key, mode === 'auto' ? 'include' : mode === 'include' ? 'exclude' : 'auto')}
                           title={
-                            mand
-                              ? 'Pflichtkurs – wird immer eingebracht'
+                            (blockI.reasons[key]?.text ?? '') +
+                            '\n' +
+                            (mand
+                              ? '(Pflichtkurs – wird immer eingebracht)'
                               : mode === 'auto'
-                                ? 'Automatisch gewählt – klicken: fest einbringen'
+                                ? '(Klicken: fest einbringen)'
                                 : mode === 'include'
-                                  ? 'Fest eingebracht – klicken: ausschließen'
-                                  : 'Ausgeschlossen – klicken: automatisch'
+                                  ? '(Klicken: ausschließen)'
+                                  : '(Klicken: wieder automatisch)')
                           }
                           className={cx(
                             'tabular inline-flex h-8 w-11 items-center justify-center rounded-lg text-sm font-semibold transition',

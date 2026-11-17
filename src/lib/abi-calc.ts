@@ -86,6 +86,34 @@ export interface BlockIResult {
   provisional: boolean
   admitted: boolean
   issues: Issue[]
+  /** Begründung je Halbjahreskurs: warum er zählt bzw. warum nicht */
+  reasons: Record<string, CourseReason>
+}
+
+export type ReasonKind =
+  // eingebracht
+  | 'lk'
+  | 'pflicht'
+  | 'forced'
+  | 'raises'
+  | 'pair'
+  | 'filler'
+  | 'deficitRule'
+  | 'provisional'
+  // nicht eingebracht (oder Problem)
+  | 'excluded'
+  | 'zero'
+  | 'projectIncomplete'
+  | 'below'
+  | 'max'
+
+export interface CourseReason {
+  included: boolean
+  kind: ReasonKind
+  /** sehr kurzes Etikett für die Tabelle */
+  short: string
+  /** ganzer Satz für Tooltip und Erklärung */
+  text: string
 }
 
 const isDeficit = (p: number) => p < 5
@@ -233,6 +261,103 @@ export function computeBlockI(all: CalcCourse[], opts: BlockIOptions = {}): Bloc
 
   const admitted = !issues.some((i) => i.level === 'error')
 
+  // --- Begründung je Kurs ---
+  const avg = ev.avg
+  const avgTxt = fmt(avg, 2)
+  const p = (x: number) => (Number.isInteger(x) ? String(x) : fmt(x, 2))
+  const completeGroups = new Set(units.filter((u) => u.courses.length > 1).map((u) => u.courses[0].projectGroup))
+  const groupAvg = new Map(units.filter((u) => u.courses.length > 1).map((u) => [u.courses[0].projectGroup, u.avg]))
+  const reasons: Record<string, CourseReason> = {}
+  for (const c of all) {
+    const id = c.id
+    let r: CourseReason
+    if (exclude.has(id)) {
+      r = { included: false, kind: 'excluded', short: 'ausgeschl.', text: 'Von dir ausgeschlossen – zählt nicht.' }
+    } else if (selectedIds.has(id)) {
+      if (c.points === 0 && isDuty(c)) {
+        r = {
+          included: true,
+          kind: 'zero',
+          short: '0 P.!',
+          text: 'Pflichtkurs mit 0 Punkten – gilt als nicht belegt. Damit fehlt ein Pflichtkurs → keine Zulassung.',
+        }
+      } else if (c.isLK) {
+        r = { included: true, kind: 'lk', short: 'LK', text: 'Leistungskurs – alle 8 LK-Kurse zählen immer, und zwar doppelt.' }
+      } else if (c.mandatory) {
+        r = {
+          included: true,
+          kind: 'pflicht',
+          short: 'Pflicht',
+          text: 'Pflichtkurs – muss eingebracht werden (Abiturfach oder Belegungsverpflichtung nach § 28 APO-GOSt), egal wie gut er ist.',
+        }
+      } else if (include.has(id)) {
+        r = { included: true, kind: 'forced', short: 'fest', text: 'Von dir fest eingebracht.' }
+      } else if (provisional) {
+        r = {
+          included: true,
+          kind: 'provisional',
+          short: 'zählt',
+          text: 'Noch weniger als 35 Kurse eingetragen – für die Hochrechnung zählen vorerst alle.',
+        }
+      } else if (c.projectGroup && c.points < avg - 1e-9 && (groupAvg.get(c.projectGroup) ?? 0) >= avg - 1e-9) {
+        r = {
+          included: true,
+          kind: 'pair',
+          short: 'Paar',
+          text: `Projektkurs: zählt nur mit beiden Halbjahren zusammen – im Paar (Ø ${fmt(groupAvg.get(c.projectGroup) ?? 0, 2)} P.) hebt er deinen Schnitt.`,
+        }
+      } else if (c.points >= avg - 1e-9) {
+        r = {
+          included: true,
+          kind: 'raises',
+          short: 'hebt Ø',
+          text: `Freiwillig eingebracht: ${p(c.points)} P. liegen über deinem Schnitt von ${avgTxt} P. – das erhöht deine Punktzahl.`,
+        }
+      } else if (selected.length <= 35 || ev.countGK <= 27) {
+        r = {
+          included: true,
+          kind: 'filler',
+          short: 'Mindestzahl',
+          text: `Liegt mit ${p(c.points)} P. unter deinem Schnitt, ist aber nötig: Es müssen mindestens 35 Kurse (27 Grundkurse) zählen – das ist einer der besten übrigen.`,
+        }
+      } else {
+        r = {
+          included: true,
+          kind: 'deficitRule',
+          short: 'Defizitregel',
+          text: `Liegt unter deinem Schnitt, ist aber nötig: Erst ab 38 eingebrachten Kursen sind 8 Defizite erlaubt (sonst nur 7).`,
+        }
+      }
+    } else if (c.points === 0) {
+      r = { included: false, kind: 'zero', short: '0 P.', text: '0 Punkte – der Kurs gilt als nicht belegt und ist nicht anrechenbar.' }
+    } else if (c.projectGroup && !completeGroups.has(c.projectGroup)) {
+      r = {
+        included: false,
+        kind: 'projectIncomplete',
+        short: 'nur Paar',
+        text: 'Projektkurs: Er zählt nur, wenn beide Halbjahre eingebracht werden – das zweite fehlt oder ist ausgeschlossen.',
+      }
+    } else if (c.points > avg + 1e-9) {
+      r = {
+        included: false,
+        kind: 'max',
+        short: 'max. 40',
+        text: `Würde mit ${p(c.points)} P. deinen Schnitt heben, aber es zählen höchstens 40 Kurse – bessere sind schon eingebracht.`,
+      }
+    } else {
+      r = {
+        included: false,
+        kind: 'below',
+        short: 'senkt Ø',
+        text:
+          Math.abs(c.points - avg) < 1e-9
+            ? `Liegt mit ${p(c.points)} P. genau auf deinem Schnitt – einbringen würde nichts ändern.`
+            : `Nicht eingebracht: ${p(c.points)} P. liegen unter deinem Schnitt von ${avgTxt} P. – der Kurs würde deine Punktzahl senken.`,
+      }
+    }
+    reasons[id] = r
+  }
+
   return {
     selected,
     notSelected,
@@ -250,6 +375,7 @@ export function computeBlockI(all: CalcCourse[], opts: BlockIOptions = {}): Bloc
     provisional,
     admitted,
     issues,
+    reasons,
   }
 }
 

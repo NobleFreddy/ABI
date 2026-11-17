@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router'
-import { Q_SEMESTERS, ROUNDING_LABELS, fmt, fmtGrade, fmtNum, type RoundingMode } from '../lib/abi-calc'
+import { Q_SEMESTERS, ROUNDING_LABELS, fmt, fmtGrade, fmtNum, type ReasonKind, type RoundingMode } from '../lib/abi-calc'
 import { simulateAll, type SimResult, type ValueSource } from '../lib/abi-simulation'
 import { useStore } from '../store/store'
 import { simInputFrom } from '../store/derived'
@@ -84,8 +84,9 @@ export function Simulation() {
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        <div className="space-y-6 lg:col-span-2">
           <SemesterTable r={r} />
+          <SelectionExplainer r={r} />
         </div>
         <div className="space-y-6">
           <ExamTable r={r} />
@@ -137,7 +138,6 @@ function SemesterTable({ r }: { r: SimResult }) {
   const courses = useStore((s) => s.courses)
   const overrides = useStore((s) => s.simulation.semesterOverrides)
   const setOverride = useStore((s) => s.setSemesterOverride)
-  const selected = new Set(r.blockI.selected.map((c) => c.id))
   const cellByKey = new Map(r.cells.map((c) => [c.key, c]))
 
   return (
@@ -183,9 +183,19 @@ function SemesterTable({ r }: { r: SimResult }) {
                     )
                   const editable = cell.source === 'estimate' || cell.source === 'override'
                   const st = SOURCE_STYLE[cell.source]
+                  const reason = r.blockI.reasons[key]
+                  const inc = reason?.included
+                  const problem = reason?.kind === 'zero' && inc
                   return (
                     <td key={s} className="px-1 py-1.5 text-center">
-                      <div className={cx('inline-flex flex-col items-center rounded-lg px-1 py-1', st.cls)} title={st.label}>
+                      <div
+                        className={cx(
+                          'inline-flex flex-col items-center rounded-lg px-1 py-1 ring-2 transition',
+                          st.cls,
+                          problem ? 'ring-rose-500' : inc ? 'ring-brand-500' : 'opacity-55 ring-transparent',
+                        )}
+                        title={`${reason ? reason.text : ''}\n(${st.label}${cell.value !== cell.rounded ? `, gerundet ${cell.rounded} P.` : ''})`}
+                      >
                         {editable ? (
                           <PointsInput
                             allowDecimals
@@ -199,13 +209,20 @@ function SemesterTable({ r }: { r: SimResult }) {
                             {fmt(cell.value, 0)}
                           </span>
                         )}
+                        {cell.value !== cell.rounded && (
+                          <span className="tabular text-[10px] text-slate-500">≈ {cell.rounded} P.</span>
+                        )}
                         <span
                           className={cx(
-                            'tabular mt-0.5 text-[10px]',
-                            selected.has(key) ? 'font-semibold text-brand-600 dark:text-brand-300' : 'text-slate-400',
+                            'mt-0.5 text-[10px] leading-tight whitespace-nowrap',
+                            problem
+                              ? 'font-semibold text-rose-600 dark:text-rose-400'
+                              : inc
+                                ? 'font-semibold text-brand-700 dark:text-brand-300'
+                                : 'text-slate-500',
                           )}
                         >
-                          {selected.has(key) ? `→ ${cell.rounded} ✓` : `→ ${cell.rounded}`}
+                          {inc ? '✓' : '✗'} {reason?.short}
                         </span>
                       </div>
                     </td>
@@ -216,9 +233,18 @@ function SemesterTable({ r }: { r: SimResult }) {
           </tbody>
         </table>
       </div>
-      <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+        <span className="flex items-center gap-1.5">
+          <span className="size-3 rounded ring-2 ring-brand-500" /> <strong className="text-brand-700 dark:text-brand-300">✓ zählt im Abi</strong>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-3 rounded bg-slate-200 opacity-60 dark:bg-slate-700" /> ✗ zählt nicht
+        </span>
+        <span>Grund steht unter jeder Note – Maus drauf für den ganzen Satz.</span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
         <span className="flex items-center gap-1">
-          <span className="size-3 rounded bg-slate-200 dark:bg-slate-700" /> geschätzt (gestrichelt = Schätzwert, eintippen zum Überschreiben)
+          <span className="size-3 rounded bg-slate-200 dark:bg-slate-700" /> geschätzt (gestrichelt – eintippen zum Überschreiben)
         </span>
         <span className="flex items-center gap-1">
           <span className="size-3 rounded bg-brand-200 dark:bg-brand-800" /> von dir gesetzt
@@ -226,8 +252,175 @@ function SemesterTable({ r }: { r: SimResult }) {
         <span className="flex items-center gap-1">
           <span className="size-3 rounded bg-amber-200 dark:bg-amber-800" /> Prognose
         </span>
-        <span>„→ x ✓“ = gerundeter Wert, eingebracht</span>
       </div>
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------- Erklärung der Kursauswahl
+
+const KIND_INFO: Record<ReasonKind, string> = {
+  lk: 'Leistungskurs – zählt immer, doppelt',
+  pflicht: 'Pflichtkurs – muss eingebracht werden',
+  forced: 'von dir fest eingebracht',
+  raises: 'liegt über deinem Schnitt – hebt deine Punktzahl',
+  pair: 'Projektkurs: im Paar über deinem Schnitt',
+  filler: 'unter dem Schnitt, aber nötig für die Mindestzahl von 35 Kursen',
+  deficitRule: 'unter dem Schnitt, aber nötig – erst ab 38 Kursen sind 8 Defizite erlaubt',
+  provisional: 'Hochrechnung – noch keine 35 Kurse eingetragen',
+  excluded: 'von dir ausgeschlossen',
+  zero: '0 Punkte – gilt als nicht belegt, nicht anrechenbar',
+  projectIncomplete: 'Projektkurs zählt nur mit beiden Halbjahren',
+  below: 'liegt unter deinem Schnitt – würde deine Punktzahl senken',
+  max: 'würde den Schnitt heben, aber höchstens 40 Kurse zählen',
+}
+
+interface ExplainRow {
+  courseId: string
+  kind: ReasonKind
+  items: { key: string; sem: string; points: number }[]
+}
+
+function groupRows(entries: { key: string; courseId: string; sem: string; points: number; kind: ReasonKind }[]): ExplainRow[] {
+  const map = new Map<string, ExplainRow>()
+  for (const e of entries) {
+    const id = `${e.courseId}|${e.kind}`
+    const row = map.get(id) ?? { courseId: e.courseId, kind: e.kind, items: [] }
+    row.items.push({ key: e.key, sem: e.sem, points: e.points })
+    map.set(id, row)
+  }
+  return [...map.values()]
+}
+
+function SelectionExplainer({ r }: { r: SimResult }) {
+  const courses = useStore((s) => s.courses)
+  const toggle = useStore((s) => s.toggleBlockI)
+  const b = r.blockI
+  const pointsByKey = new Map(r.cells.map((c) => [c.key, c.rounded]))
+  const courseById = new Map(courses.map((c) => [c.id, c]))
+
+  const entries = Object.entries(b.reasons).map(([key, reason]) => {
+    const [courseId, sem] = key.split('|')
+    return { key, courseId, sem, points: pointsByKey.get(key) ?? 0, kind: reason.kind, included: reason.included }
+  })
+  const lk = entries.filter((e) => e.included && e.kind === 'lk').length
+  const duty = entries.filter((e) => e.included && (e.kind === 'pflicht' || e.kind === 'zero')).length
+  const free = entries.filter((e) => e.included && !['lk', 'pflicht', 'zero'].includes(e.kind))
+  const out = entries.filter((e) => !e.included)
+  const order: ReasonKind[] = ['below', 'max', 'excluded', 'zero', 'projectIncomplete']
+  const outRows = groupRows(out).sort((a, z) => order.indexOf(a.kind) - order.indexOf(z.kind))
+  const freeRows = groupRows(free)
+  const dutyRows = groupRows(entries.filter((e) => e.included && ['lk', 'pflicht', 'zero'].includes(e.kind)))
+
+  const action = (kind: ReasonKind, included: boolean): { label: string; mode: 'include' | 'exclude' | 'auto' } | null => {
+    if (kind === 'forced' || kind === 'excluded') return { label: 'automatisch', mode: 'auto' }
+    if (included && ['raises', 'pair', 'filler', 'deficitRule'].includes(kind)) return { label: 'ausschließen', mode: 'exclude' }
+    if (!included && (kind === 'below' || kind === 'max')) return { label: 'einbringen', mode: 'include' }
+    return null
+  }
+
+  const Row = ({ row, included }: { row: ExplainRow; included: boolean }) => {
+    const c = courseById.get(row.courseId)
+    const act = action(row.kind, included)
+    return (
+      <li className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
+        <div className="flex flex-wrap items-center gap-2">
+          <SubjectDot color={c?.color ?? '#94a3b8'} />
+          <span className="font-medium">{c?.name ?? row.courseId}</span>
+          {row.items.map((it) =>
+            act ? (
+              <button
+                key={it.key}
+                onClick={() => toggle(it.key, act.mode)}
+                title={`Klicken: ${act.label}`}
+                className={cx(
+                  'tabular rounded-md border px-1.5 py-0.5 text-xs transition hover:border-brand-500',
+                  included ? 'border-brand-300 text-brand-700 dark:border-brand-700 dark:text-brand-300' : 'border-slate-300 text-slate-600 dark:border-slate-600 dark:text-slate-300',
+                )}
+              >
+                {it.sem} · {it.points} P. <span className="opacity-60">({act.label})</span>
+              </button>
+            ) : (
+              <span key={it.key} className="tabular rounded-md border border-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                {it.sem} · {it.points} P.
+              </span>
+            ),
+          )}
+        </div>
+        <div className={cx('mt-1 text-xs', row.kind === 'zero' ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500')}>
+          {KIND_INFO[row.kind]}
+        </div>
+      </li>
+    )
+  }
+
+  return (
+    <Card title="Welche Kurse zählen – und warum" icon="info">
+      <p className="text-sm">
+        Es zählen <strong>{b.count} von {entries.length}</strong> Halbjahreskursen: <strong>{lk}</strong> LK-Kurse (doppelt gewertet),{' '}
+        <strong>{duty}</strong> Pflichtkurse und <strong>{free.length}</strong> freiwillig gewählte.
+      </p>
+      <p className="tabular mt-1 text-sm text-slate-500">
+        Schnitt: Ø {fmt(b.average, 2)} Punkte pro Kurs → ({b.P} : {b.S}) × 40 = {fmt(b.exact, 3)} → <strong>{b.points} Punkte</strong> in Block I
+      </p>
+
+      <ol className="mt-3 list-decimal space-y-1 rounded-xl bg-brand-50 py-3 pr-3 pl-8 text-sm text-slate-700 dark:bg-brand-900/20 dark:text-slate-300">
+        <li>
+          <strong>Pflicht:</strong> alle 8 LK-Kurse (doppelt), die Abiturfächer und deine Pflichtbelegungen zählen immer.
+        </li>
+        <li>
+          <strong>Auffüllen</strong> auf mindestens 35 Kurse (27 Grundkurse) mit deinen besten übrigen Kursen.
+        </li>
+        <li>
+          <strong>Weitere Kurse</strong> (bis höchstens 40) nur, wenn sie über deinem Schnitt liegen – sonst würden sie ihn senken.
+        </li>
+        <li>
+          <strong>Grenzen:</strong> höchstens {b.maxDeficits} Defizite bei {b.count} Kursen (davon max. 3 im LK, aktuell {b.deficits});
+          Kurse mit 0 Punkten zählen nie.
+        </li>
+      </ol>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-brand-700 dark:text-brand-300">✓ Freiwillig eingebracht ({free.length})</h3>
+          {freeRows.length === 0 ? (
+            <p className="text-sm text-slate-500">Keine – es zählen nur Pflicht- und LK-Kurse.</p>
+          ) : (
+            <ul className="space-y-2">
+              {freeRows.map((row) => (
+                <Row key={`${row.courseId}|${row.kind}`} row={row} included />
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-slate-600 dark:text-slate-300">✗ Nicht eingebracht ({out.length})</h3>
+          {outRows.length === 0 ? (
+            <p className="text-sm text-slate-500">Alle Kurse zählen.</p>
+          ) : (
+            <ul className="space-y-2">
+              {outRows.map((row) => (
+                <Row key={`${row.courseId}|${row.kind}`} row={row} included={false} />
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <details className="mt-4">
+        <summary className="cursor-pointer text-sm font-medium text-slate-600 dark:text-slate-300">
+          Pflicht- und LK-Kurse anzeigen ({lk + duty})
+        </summary>
+        <ul className="mt-2 space-y-2">
+          {dutyRows.map((row) => (
+            <Row key={`${row.courseId}|${row.kind}`} row={row} included />
+          ))}
+        </ul>
+      </details>
+      <p className="mt-3 text-xs text-slate-500">
+        Mit „einbringen“ / „ausschließen“ legst du Kurse von Hand fest – das gilt auch im Abi-Rechner. „automatisch“ hebt das
+        wieder auf.
+      </p>
     </Card>
   )
 }
