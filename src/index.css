@@ -1,0 +1,95 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+}
+
+/* Fächerfarben = validierte Kategorien-Palette (Reihenfolge ist CVD-geprüft: Geo, Latein, Mathe, Bio) */
+html {
+  color-scheme: light;
+  --subj-geo: #2a78d6;
+  --subj-latein: #eb6834;
+  --subj-mathe: #1baf7a;
+  --subj-bio: #eda100;
+  --subj-other: #a8a29e;
+  --chart-surface: #ffffff;
+  --chart-grid: #e7e5e4;
+  --chart-empty: #f1f5f9;
+  --seq-1: #b7d3f6;
+  --seq-2: #6da7ec;
+  --seq-3: #2a78d6;
+  --seq-4: #184f95;
+}
+html.dark {
+  color-scheme: dark;
+  --subj-geo: #3987e5;
+  --subj-latein: #d95926;
+  --subj-mathe: #199e70;
+  --subj-bio: #c98500;
+  --subj-other: #57534e;
+  --chart-surface: #0f172a;
+  --chart-grid: #1e293b;
+  --chart-empty: #1e293b;
+  --seq-1: #184f95;
+  --seq-2: #256abf;
+  --seq-3: #3987e5;
+  --seq-4: #86b6ef;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Grid-Kinder dürfen schmaler als ihr Inhalt werden (sonst sprengen Tabellen/lange Texte die Handy-Breite) */
+.grid > * {
+  min-width: 0;
+}
+
+/* Zahlen in Tabellen sauber untereinander */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Karteikarte umdrehen */
+.flip-in {
+  animation: flip-in 0.25s ease-out;
+}
+@keyframes flip-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.katex {
+  font-size: 1.05em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
