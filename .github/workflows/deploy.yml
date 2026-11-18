@@ -1,18 +1,20 @@
-# Baut die App bei jedem Hochladen auf main und legt die fertige Seite in den Branch „gh-pages“.
-# GitHub Pages veröffentlicht diesen Branch:
-#   Repository → Settings → Pages → Source: „Deploy from a branch“ → Branch: gh-pages, Ordner: / (root)
+# Baut die App bei jedem Hochladen auf main und legt die fertige Seite ab:
+#   1. in den Ordner docs/ auf main  → funktioniert mit „Deploy from a branch: main / (root)“
+#      (index.html leitet auf GitHub Pages nach docs/ weiter) und mit „main / docs“
+#   2. in den Branch gh-pages         → funktioniert mit „Deploy from a branch: gh-pages / (root)“
 name: Webseite bauen
 
 on:
   push:
     branches: [main]
+    paths-ignore: ['docs/**']
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: gh-pages
+  group: pages-build
   cancel-in-progress: true
 
 jobs:
@@ -26,14 +28,27 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run build
+      - run: npm run build -- --outDir docs --emptyOutDir
+      - run: touch docs/.nojekyll
 
-      - name: Fertige Seite in den Branch gh-pages legen
-        working-directory: dist
+      - name: Fertige Seite nach docs/ auf main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A docs
+          if git diff --cached --quiet; then
+            echo "docs/ unverändert"
+          else
+            git commit -q -m "Seite gebaut aus ${GITHUB_SHA::7} [skip ci]"
+            git push
+          fi
+
+      - name: Fertige Seite in den Branch gh-pages
+        working-directory: docs
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          touch .nojekyll
+          rm -rf .git
           git init -q -b gh-pages
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
