@@ -15,6 +15,7 @@ import {
   clampPoints,
   computeBlockI,
   computeBlockII,
+  computedGrade,
   exactGradeValue,
   gradeFromPoints,
   roundBy,
@@ -89,6 +90,8 @@ export interface SimResult {
   blockII: BlockIIResult
   total: number
   grade: number | null
+  /** rechnerischer Schnitt ohne Begrenzung auf 1,0 */
+  computed: number | null
   passed: boolean
   exact: {
     blockI: number
@@ -249,6 +252,7 @@ export function simulate(input: SimInput, mode: RoundingMode): SimResult {
     blockII,
     total,
     grade,
+    computed: computedGrade(total),
     passed: blockI.admitted && blockII.passed && grade != null,
     exact: {
       blockI: blockIExact.exact,

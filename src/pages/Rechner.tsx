@@ -3,6 +3,8 @@ import { Link } from 'react-router'
 import {
   Q_SEMESTERS,
   computeBlockII,
+  computedGrade,
+  exactGradeValue,
   fmt,
   fmtGrade,
   gradeFromPoints,
@@ -33,7 +35,13 @@ export function Rechner() {
         <Stat
           label="Abiturnote"
           value={grade != null ? fmtGrade(grade) : '–'}
-          sub={blockII.complete ? (grade == null ? 'unter 300 Punkte' : 'offizielle Tabelle') : 'erst mit allen Prüfungen – siehe Simulation'}
+          sub={
+            blockII.complete
+              ? grade == null
+                ? 'unter 300 Punkte'
+                : `rechnerisch ${fmtGrade(computedGrade(total))} · exakt ${fmt(exactGradeValue(total), 3)}`
+              : 'erst mit allen Prüfungen – siehe Simulation'
+          }
           tone={grade != null ? 'good' : undefined}
         />
       </div>
@@ -260,7 +268,8 @@ function BllRow() {
   )
 }
 
-const GRADES = Array.from({ length: 31 }, (_, i) => Math.round((1 + i * 0.1) * 10) / 10)
+// 0,6 … 0,9 sind nur rechnerisch möglich (offiziell ist 1,0 die beste Note)
+const GRADES = Array.from({ length: 35 }, (_, i) => Math.round((0.6 + i * 0.1) * 10) / 10)
 
 function Zielrechner({ blockI }: { blockI: number }) {
   const [target, setTarget] = useState(2.0)
@@ -274,14 +283,20 @@ function Zielrechner({ blockI }: { blockI: number }) {
     <Card title="Zielrechner" icon="target">
       <div className="flex items-center gap-2 text-sm">
         Ich möchte eine
-        <Select className="w-24" value={target} onChange={(e) => setTarget(Number(e.target.value))}>
+        <Select className="w-40" value={target} onChange={(e) => setTarget(Number(e.target.value))}>
           {GRADES.map((g) => (
             <option key={g} value={g}>
               {fmtGrade(g)}
+              {g < 1 ? ' (rechnerisch)' : ''}
             </option>
           ))}
         </Select>
       </div>
+      {target < 1 && (
+        <p className="mt-2 text-xs text-slate-500">
+          Rechnerischer Schnitt unter 1,0 – im Zeugnis steht dann offiziell eine 1,0.
+        </p>
+      )}
       <div className="mt-3 space-y-1 text-sm">
         <div>
           Dafür brauchst du insgesamt <strong className="tabular">{needed}</strong> Punkte.
@@ -372,7 +387,14 @@ function WasWaereWenn({ blockI }: { blockI: number }) {
         <div className="text-sm">
           {blockI} + {res.points} = <strong className="tabular">{total}</strong> Punkte
         </div>
-        <div className="tabular text-2xl font-bold text-brand-600 dark:text-brand-300">{grade == null ? '–' : fmtGrade(grade)}</div>
+        <div className="text-right">
+          <div className="tabular text-2xl font-bold text-brand-600 dark:text-brand-300">{grade == null ? '–' : fmtGrade(grade)}</div>
+          {grade != null && (
+            <div className="tabular text-[11px] text-slate-500">
+              rechnerisch {fmtGrade(computedGrade(total))} · exakt {fmt(exactGradeValue(total), 3)}
+            </div>
+          )}
+        </div>
       </div>
       {!res.passed && <p className="mt-2 text-xs text-rose-600">Mit diesen Werten wären die Bestehensregeln in Block II nicht erfüllt.</p>}
       <p className="mt-2 text-xs text-slate-500">

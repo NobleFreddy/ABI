@@ -6,10 +6,12 @@ import {
   computeBlockI,
   computeBlockII,
   examPoints,
+  computedGrade,
   exactGradeValue,
   gradeFromPoints,
   parsePoints,
   pointsNeededForGrade,
+  pointRangeForGrade,
   roundBy,
 } from './abi-calc'
 
@@ -347,6 +349,24 @@ describe('Durchschnittsnote', () => {
       expect(Math.floor(exactGradeValue(p) * 10 + 1e-9) / 10).toBeCloseTo(official, 5)
     }
     expect(exactGradeValue(669)).toBeCloseTo(1.95, 3)
+  })
+  it('rechnerischer Schnitt geht unter 1,0 – offizielle Note bleibt 1,0', () => {
+    expect(computedGrade(900)).toBe(0.6)
+    expect(exactGradeValue(900)).toBeCloseTo(0.667, 3)
+    expect(computedGrade(895)).toBe(0.6)
+    expect(computedGrade(894)).toBe(0.7)
+    expect(computedGrade(859)).toBe(0.8)
+    expect(computedGrade(841)).toBe(0.9)
+    expect(computedGrade(840)).toBe(1.0)
+    expect(computedGrade(823)).toBe(1.0)
+    expect(computedGrade(822)).toBe(1.1)
+    expect(computedGrade(299)).toBeNull()
+    for (let p = 300; p <= 822; p++) expect(computedGrade(p)).toBe(gradeFromPoints(p))
+    for (let p = 823; p <= 900; p++) expect(gradeFromPoints(p)).toBe(1.0)
+    // Zielrechner auch für rechnerische Noten unter 1,0
+    expect(pointsNeededForGrade(0.8)).toBe(859)
+    expect(pointRangeForGrade(0.6)).toEqual([895, 900])
+    expect(pointRangeForGrade(1.0)).toEqual([823, 840])
   })
 })
 

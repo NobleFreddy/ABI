@@ -101,7 +101,10 @@ function PrognoseCard() {
           <div className="flex items-end gap-4">
             <div className="text-6xl font-bold tracking-tight text-brand-600 dark:text-brand-300">{fmtGrade(r.grade)}</div>
             <div className="pb-2 text-sm text-slate-500">
-              <div className="tabular">exakt {fmt(r.exact.gradeValue, 3)}</div>
+              <div className="tabular">
+                rechnerisch <strong className="text-slate-700 dark:text-slate-200">{fmtGrade(r.computed)}</strong> · exakt{' '}
+                {fmt(r.exact.gradeValue, 3)}
+              </div>
               <div className="tabular">{r.total} / 900 Punkte</div>
             </div>
           </div>

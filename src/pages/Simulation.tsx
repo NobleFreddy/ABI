@@ -77,7 +77,7 @@ export function Simulation() {
               <span className="tabular text-sm text-slate-500">{all[m].total} Punkte</span>
             </div>
             <div className="tabular mt-1 text-xs text-slate-500">
-              Block I {all[m].blockI.points} · Block II {all[m].blockII.points}
+              Block I {all[m].blockI.points} · Block II {all[m].blockII.points} · rechnerisch {fmtGrade(all[m].computed)}
             </div>
           </button>
         ))}
@@ -110,7 +110,13 @@ function ResultHero({ r }: { r: SimResult }) {
       <div>
         <div className="text-sm opacity-80">Simulierte Abiturnote</div>
         <div className="tabular text-6xl font-bold tracking-tight">{fmtGrade(r.grade)}</div>
-        <div className="tabular text-sm opacity-90">exakter Notenwert {fmt(r.exact.gradeValue, 3)}</div>
+        <div className="mt-1 rounded-lg bg-white/15 px-2.5 py-1.5 text-sm">
+          Rechnerischer Schnitt: <strong className="tabular text-base">{fmtGrade(r.computed)}</strong>
+          <span className="tabular opacity-80"> · exakt {fmt(r.exact.gradeValue, 3)}</span>
+        </div>
+        {r.computed != null && r.computed < 1 && (
+          <div className="mt-1 max-w-64 text-xs opacity-85">Besser als 1,0 – offiziell ist 1,0 die beste Note, rechnerisch liegst du darunter.</div>
+        )}
         {!r.passed && <Badge tone="red" className="mt-2">Regeln nicht erfüllt</Badge>}
       </div>
       <dl className="grid grid-cols-3 gap-3 self-center">

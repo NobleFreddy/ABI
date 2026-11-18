@@ -485,22 +485,33 @@ export function gradeFromPoints(total: number): number | null {
   return Math.floor((1020 - p) / 18) / 10
 }
 
-/** Exakter (ungekürzter) Notenwert 17/3 − P/180, nach oben auf 1,0 begrenzt. */
-export function exactGradeValue(total: number): number {
-  return Math.max(1, 17 / 3 - total / 180)
+/**
+ * Rechnerischer Abischnitt: dieselbe Formel wie die offizielle Note (17/3 − P/180, auf eine
+ * Nachkommastelle abgeschnitten), aber ohne Begrenzung auf 1,0 – z. B. 900 Punkte → 0,6.
+ * null = unter 300 Punkte.
+ */
+export function computedGrade(total: number): number | null {
+  const p = Math.floor(total)
+  if (p < 300) return null
+  return Math.floor((1020 - p) / 18) / 10
 }
 
-/** Mindestpunktzahl (gesamt) für eine Zielnote, z. B. 1.5 → 733. */
+/** Exakter, ungekürzter Notenwert 17/3 − P/180 (ohne Begrenzung, 900 Punkte → 0,667). */
+export function exactGradeValue(total: number): number {
+  return 17 / 3 - total / 180
+}
+
+/** Mindestpunktzahl (gesamt) für eine Zielnote, z. B. 1.5 → 733; rechnerisch auch unter 1,0 (0.8 → 859). */
 export function pointsNeededForGrade(grade: number): number {
   const n10 = Math.round(grade * 10)
   return Math.max(300, 1003 - 18 * n10)
 }
 
-/** Punktbereich einer Note, z. B. 1.5 → [733, 750]. */
+/** Punktbereich einer (rechnerischen) Note, z. B. 1.5 → [733, 750], 0.6 → [895, 900]. */
 export function pointRangeForGrade(grade: number): [number, number] {
   const n10 = Math.round(grade * 10)
   const min = pointsNeededForGrade(grade)
-  const max = n10 <= 10 ? 900 : 1020 - 18 * n10
+  const max = Math.min(900, 1020 - 18 * n10)
   return [min, max]
 }
 
